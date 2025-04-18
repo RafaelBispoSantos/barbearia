@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # API
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: barber-saas-api
+    container_name: barber-saas-api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongodb
+    env_file:
+      - .env
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    networks:
+      - barber-saas-network
+
+  # MongoDB
+  mongodb:
+    image: mongo:latest
+    container_name: barber-saas-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - barber-saas-network
+
+  # NGINX (para roteamento de subdomínios em desenvolvimento)
+  nginx:
+    image: nginx:alpine
+    container_name: barber-saas-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/certs:/etc/nginx/certs
+    depends_on:
+      - api
+    networks:
+      - barber-saas-network
+
+  # Serviço para agendamento de tarefas (cron jobs)
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+    image: barber-saas-scheduler
+    container_name: barber-saas-scheduler
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    env_file:
+      - .env
+    networks:
+      - barber-saas-network
+
+volumes:
+  mongodb-data:
+
+networks:
+  barber-saas-network:
+    driver: bridge
